@@ -1399,12 +1399,12 @@ function viewVisits(linkId, linkName) {
           const cameraBadge = v.cameraCaptured
             ? '<span style="color:#81c995;font-size:10px">📷 Photo</span>'
             : '';
-          return `<div class="visit-item">
-            <span class="visit-ip">${v.ip}</span>
-            <span class="visit-device">${v.device.browser} · ${v.device.os}${v.device.isMobile ? ' · Mobile' : ''}</span>
-            ${cameraBadge}
-            <span class="visit-time">${new Date(v.timestamp).toLocaleString()}</span>
-          </div>`;
+          return '<div class="visit-item">' +
+            '<span class="visit-ip">' + v.ip + '</span>' +
+            '<span class="visit-device">' + v.device.browser + ' · ' + v.device.os + (v.device.isMobile ? ' · Mobile' : '') + '</span>' +
+            cameraBadge +
+            '<span class="visit-time">' + new Date(v.timestamp).toLocaleString() + '</span>' +
+            '</div>';
         }).join('');
       }
       openModal('visits');
